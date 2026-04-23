@@ -2,7 +2,7 @@
    TRAVEL PLANNER CHATBOT - JAVASCRIPT
    ============================================
 
-   IMPORTANT: API KEY SETUP FOR VERCEL
+   API KEY SETUP FOR VERCEL (Backend API)
    
    1. Get your Gemini API key from: https://makersuite.google.com/app/apikey
    
@@ -12,23 +12,26 @@
       - Value: Your actual API key
       - Apply to: Production, Preview, Development
    
-   3. The API key will be injected at build time.
+   3. The API key will be securely stored on the server side.
    
-   SECURITY NOTE:
-   - The API key is exposed in the frontend code.
-   - This is acceptable for frontend-only apps with daily limits.
-   - For production with high traffic, use a backend proxy server.
-   - Backend approach: Send request to your server which calls Gemini API.
+   SECURITY BENEFITS:
+   - API key is stored only on the server in environment variables
+   - API key is never exposed to the frontend
+   - All API calls go through your backend serverless function (/api/chat)
+   - Safe for production use with high traffic
+   - No daily limits issues
+   
+   LOCAL DEVELOPMENT:
+   - Create a .env file with: GEMINI_API_KEY=your_actual_key
+   - Run: npm vercel dev (or npx vercel dev)
+   - Access at: http://localhost:3000
+   - Backend API at: http://localhost:3000/api/chat
    
    ============================================ */
 
 // ============================================
 // CONFIGURATION & CONSTANTS
 // ============================================
-
-// API Configuration
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'YOUR_API_KEY_HERE';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/chat/completions';
 
 // System prompt for travel planner
 const SYSTEM_PROMPT = `You are an expert Travel Planner Assistant. You help users plan their trips with detailed information about:
@@ -109,12 +112,6 @@ async function handleSendMessage() {
 
     if (!message || isLoading) return;
 
-    // Validate API key
-    if (GEMINI_API_KEY === 'YOUR_API_KEY_HERE') {
-        showAlert('⚠️ API Key Not Configured!\n\nPlease add your Gemini API key to Vercel environment variables.\n\nInstructions in script.js');
-        return;
-    }
-
     // Clear input
     userInput.value = '';
 
@@ -148,7 +145,7 @@ async function handleSendMessage() {
         });
     } catch (error) {
         removeTypingIndicator();
-        const errorMessage = `❌ Error: ${error.message}\n\nMake sure your GEMINI_API_KEY is set correctly in Vercel environment variables.`;
+        const errorMessage = `❌ Error: ${error.message}`;
         addMessageToUI(errorMessage, 'bot');
         console.error('API Error:', error);
     }
@@ -328,148 +325,55 @@ function getCurrentTime() {
 }
 
 // ============================================
-// API INTEGRATION - GEMINI
+// API INTEGRATION - BACKEND (SECURE)
 // ============================================
 
 /**
- * Get response from Gemini API
+ * Get response from Gemini API via secure backend endpoint
  * 
- * IMPORTANT: Uses fetch() to call Gemini API directly from frontend
- * For Vercel deployment:
- * 1. API key is stored in environment variables
- * 2. Injected at build time via process.env.GEMINI_API_KEY
- * 3. Keep implementation simple, upgradeable to backend later
+ * IMPORTANT: The API key is kept on the server side (not exposed in browser)
+ * This backend endpoint:
+ * 1. Receives the user message from the frontend
+ * 2. Calls Gemini API with the API key stored in environment variables
+ * 3. Returns only the response text to the frontend
+ * 
+ * API Key Security:
+ * - Never exposed in frontend code
+ * - Only accessible on the server through environment variables
+ * - Safe for production use with high traffic
  */
 async function getGeminiResponse(userMessage) {
-    // Check if API key is configured
-    if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_API_KEY_HERE') {
-        throw new Error('Gemini API key is not configured. Add GEMINI_API_KEY to Vercel environment variables.');
-    }
-
-    // Prepare the request payload
-    const payload = {
-        model: 'gemini-2.5-flash-lite', // Using Gemini 2.5 Flash Lite
-        messages: [
-            {
-                role: 'system',
-                content: SYSTEM_PROMPT
-            },
-            ...conversationHistory.map(msg => ({
-                role: msg.role === 'assistant' ? 'assistant' : 'user',
-                content: msg.content
-            })),
-            {
-                role: 'user',
-                content: userMessage
-            }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-    };
-
-    // Note: If using Gemini directly, use:
-    // const payload = {
-    //     contents: [{
-    //         parts: [{
-    //             text: userMessage
-    //         }],
-    //         role: 'user'
-    //     }]
-    // };
+    const apiUrl = '/api/chat'; // Vercel serverless function endpoint
 
     try {
-        // Alternative: Direct Gemini API call
-        return await getGeminiDirectResponse(userMessage);
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: userMessage,
+                conversationHistory: conversationHistory,
+                systemPrompt: SYSTEM_PROMPT
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.response) {
+            return data.response;
+        } else {
+            throw new Error('Invalid response from backend');
+        }
+
     } catch (error) {
         throw new Error(`Failed to get response: ${error.message}`);
     }
-}
-
-/**
- * Get response directly from Gemini API
- * Using Gemini 1.5 Flash API
- */
-async function getGeminiDirectResponse(userMessage) {
-    // Using Gemini API endpoint
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-    const payload = {
-        contents: [
-            {
-                role: 'user',
-                parts: [
-                    {
-                        text: SYSTEM_PROMPT + '\n\nConversation history:\n'
-                    }
-                ]
-            },
-            ...conversationHistory.map(msg => ({
-                role: msg.role === 'assistant' ? 'model' : 'user',
-                parts: [
-                    {
-                        text: msg.content
-                    }
-                ]
-            })),
-            {
-                role: 'user',
-                parts: [
-                    {
-                        text: userMessage
-                    }
-                ]
-            }
-        ],
-        generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1000,
-        },
-        safetySettings: [
-            {
-                category: 'HARM_CATEGORY_HARASSMENT',
-                threshold: 'BLOCK_NONE',
-            },
-            {
-                category: 'HARM_CATEGORY_HATE_SPEECH',
-                threshold: 'BLOCK_NONE',
-            },
-            {
-                category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                threshold: 'BLOCK_NONE',
-            },
-            {
-                category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                threshold: 'BLOCK_NONE',
-            },
-        ],
-    };
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-            errorData?.error?.message ||
-            `API error: ${response.status} ${response.statusText}`
-        );
-    }
-
-    const data = await response.json();
-
-    // Extract text from response
-    if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-        return data.candidates[0].content.parts[0].text;
-    }
-
-    throw new Error('Invalid response format from Gemini API');
 }
 
 // ============================================
@@ -484,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
     userInput.focus();
 
     console.log('Travel Planner Chatbot initialized');
-    console.log('API Key configured:', GEMINI_API_KEY !== 'YOUR_API_KEY_HERE');
+    console.log('Backend API endpoint: /api/chat');
 });
 
 // ============================================

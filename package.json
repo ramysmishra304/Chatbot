@@ -1,0 +1,17 @@
+{
+  "name": "travel-planner-chatbot",
+  "version": "1.0.0",
+  "description": "AI-powered travel planning chatbot with Gemini API",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build",
+    "start": "vercel start"
+  },
+  "keywords": ["travel", "chatbot", "gemini", "ai"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "vercel": "latest"
+  }
+}
