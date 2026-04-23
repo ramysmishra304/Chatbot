@@ -4,10 +4,10 @@
   "description": "AI-powered travel planning chatbot with Gemini API",
   "main": "index.html",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "npx http-server",
     "build": "vercel build",
     "start": "vercel start"
-  },
+},
   "keywords": ["travel", "chatbot", "gemini", "ai"],
   "author": "",
   "license": "MIT",
