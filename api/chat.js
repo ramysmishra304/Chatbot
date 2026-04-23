@@ -19,13 +19,13 @@ export default async function handler(req, res) {
         }
 
         // Get API key from environment variables
-        const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-        if (!GEMINI_API_KEY) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
             return res.status(500).json({ error: 'Gemini API key is not configured' });
         }
 
         // Gemini API endpoint
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
 
         // Build conversation for Gemini
         const contents = [
